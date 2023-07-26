@@ -1,12 +1,8 @@
 import {memo} from "react";
-import type {ReactNode,FC} from "react"
+import type {FC} from "react"
 import {RoomPhoneWrapper} from "@/views/room-phone/style";
 
-interface IProp {
-    children?: ReactNode
-}
-
-const RoomPhone: FC<IProp> = () => {
+const RoomPhone: FC = () => {
     return <RoomPhoneWrapper>RoomPhone</RoomPhoneWrapper>
 }
 
