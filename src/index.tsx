@@ -4,6 +4,7 @@ import {HashRouter} from "react-router-dom";
 import App from './App';
 
 import "webrtc-adapter"
+import "@/lib/eventBus";
 import "@/assets/css/reset.css"
 
 const root = ReactDOM.createRoot(

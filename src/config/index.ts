@@ -1,1 +1,1 @@
-export {}
+export const socket_url = ""
