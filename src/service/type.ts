@@ -5,9 +5,12 @@ export interface IEventParams {
 
 export enum EventName {
     ON_JOIN_ROOM = "onJoinRoom",
-    ON_LEAVE_ROOM = "onLeaveRoom",
+    ON_NEW_CLIENT = "onNewClient",
+    ON_LEAVE = "onLeave",
     ON_VIDEO_STATUS = "onVideoStatus",
-    ON_AUDIO_STATUS = "onAudioStatus"
+    ON_AUDIO_STATUS = "onAudioStatus",
+    ON_OFFER = "onOffer",
+    ON_ANSWER = "onAnswer"
 }
 
 export interface IJoinParams {
@@ -20,4 +23,9 @@ export interface IJoinParams {
 export interface IStatusParams {
     userId: string
     status: boolean
+}
+
+export interface ISdpParams {
+    targetId: string
+    sdp: RTCSessionDescriptionInit
 }

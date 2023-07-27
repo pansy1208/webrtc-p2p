@@ -10,6 +10,13 @@ socket.registerEvent({
 })
 
 socket.registerEvent({
+    method: "newClient",
+    cb: (data) => {
+        eventBus.emit(EventName.ON_NEW_CLIENT, data)
+    }
+})
+
+socket.registerEvent({
     method: "videoStatus",
     cb: (data) => {
         eventBus.emit(EventName.ON_VIDEO_STATUS, data)
@@ -26,6 +33,20 @@ socket.registerEvent({
 socket.registerEvent({
     method: "leaveRoom",
     cb: (data) => {
-        eventBus.emit(EventName.ON_LEAVE_ROOM, data)
+        eventBus.emit(EventName.ON_LEAVE, data)
+    }
+})
+
+socket.registerEvent({
+    method: "offer",
+    cb: (data) => {
+        eventBus.emit(EventName.ON_OFFER, data)
+    }
+})
+
+socket.registerEvent({
+    method: "answer",
+    cb: (data) => {
+        eventBus.emit(EventName.ON_ANSWER, data)
     }
 })

@@ -1,5 +1,5 @@
 import socket from "@/service/socket";
-import type {IJoinParams, IStatusParams} from "@/service/type";
+import type {IJoinParams, IStatusParams, ISdpParams} from "@/service/type";
 
 class SocketService {
     public initSocket() {
@@ -19,6 +19,14 @@ class SocketService {
     }
 
     public changeAudioStatus(params: IStatusParams) {
+        socket.sendMessage(params)
+    }
+
+    public sendOffer(params: ISdpParams) {
+        socket.sendMessage(params)
+    }
+
+    public sendAnswer(params: ISdpParams) {
         socket.sendMessage(params)
     }
 }
