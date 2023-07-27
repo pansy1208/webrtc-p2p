@@ -24,9 +24,10 @@ class Socket {
             } else if (message.data === "nping") {
                 this.socket!.send("npong")
             } else {
+                const messageObj = JSON.parse(message.data)
                 for (let i = 0; i < this.eventList.length; i++) {
-                    if (this.eventList[i].method === message.data.method) {
-                        this.eventList[i].cb(message.data)
+                    if (this.eventList[i].method === messageObj.method) {
+                        this.eventList[i].cb(messageObj)
                         break
                     }
                 }
@@ -39,7 +40,7 @@ class Socket {
     }
 
     public sendMessage(params: any) {
-        this.socket!.send(params)
+        this.socket!.send(JSON.stringify(params))
     }
 
     public registerEvent(event: IEventParams) {

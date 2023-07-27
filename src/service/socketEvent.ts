@@ -1,6 +1,6 @@
 import socket from "@/service/socket";
 import eventBus from "@/lib/eventBus";
-import {EventName} from "@/service/type";
+import {EventName, INewClientParams} from "@/service/type";
 
 socket.registerEvent({
     method: "joinRoom",
@@ -11,7 +11,7 @@ socket.registerEvent({
 
 socket.registerEvent({
     method: "newClient",
-    cb: (data) => {
+    cb: (data: INewClientParams) => {
         eventBus.emit(EventName.ON_NEW_CLIENT, data)
     }
 })
@@ -31,7 +31,7 @@ socket.registerEvent({
 })
 
 socket.registerEvent({
-    method: "leaveRoom",
+    method: "leave",
     cb: (data) => {
         eventBus.emit(EventName.ON_LEAVE, data)
     }

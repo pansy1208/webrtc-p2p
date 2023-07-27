@@ -18,14 +18,30 @@ export interface IJoinParams {
     isHasAuth: boolean
     videoStatus: boolean
     roomId: string
+    method: "joinRoom"
 }
 
 export interface IStatusParams {
     userId: string
     status: boolean
+    method: "videoStatus" | "audioStatus"
 }
 
 export interface ISdpParams {
+    roomId: string
+    userId: string
     targetId: string
     sdp: RTCSessionDescriptionInit
+    method: "offer" | "answer"
+}
+
+export interface INewClientParams {
+    user: {
+        videoStatus: boolean
+        audioStatus: boolean
+        id: string
+        isHasAuth: true
+        name: string
+    }
+    method: "newClient"
 }

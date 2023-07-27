@@ -2,11 +2,14 @@ import type {IJoinInfo} from "@/lib/type";
 import socketService from "@/service/socketService";
 import eventBus from "@/lib/eventBus";
 import {EventName, ISdpParams} from "@/service/type";
+import "@/service/socketEvent"
 
 class WebRTCClient {
     private videoDom: HTMLVideoElement
     private myStream: MediaStream | null = null
     private peerMap: Map<string, RTCPeerConnection> = new Map()
+    private roomId: string = ""
+    public userId: string = ""
     public isHasAuth: boolean = true
     public constraints: MediaStreamConstraints = {
         audio: true,
@@ -14,7 +17,7 @@ class WebRTCClient {
     }
 
     constructor(videoDom: HTMLVideoElement, constraints?: MediaStreamConstraints) {
-        // socketService.initSocket()
+        socketService.initSocket()
         this.videoDom = videoDom
         if (constraints) this.constraints = constraints
         eventBus.on(EventName.ON_OFFER, async (data: ISdpParams) => {
@@ -39,7 +42,15 @@ class WebRTCClient {
     }
 
     private async createRTCPeer(targetId: string): Promise<RTCPeerConnection> {
-        const peer = new RTCPeerConnection()
+        const peer = new RTCPeerConnection({
+            iceServers: [{
+                username: "527meeting",
+                urls: "turn:firepocket.fans:30001?transport=tcp",
+                credential: "Ilove527meeting"
+            }],
+            iceTransportPolicy: "relay"
+        })
+
         this.peerMap.set(targetId, peer)
         if (this.myStream) {
             for (const track of this.myStream.getTracks()) {
@@ -48,13 +59,14 @@ class WebRTCClient {
         }
         peer.addEventListener("track", (event) => {
             const videoDom = document.getElementById(`video_${targetId}`) as HTMLVideoElement
+            console.log(videoDom)
             videoDom.srcObject = event.streams[0]
         })
 
-        peer.addEventListener("icecandidate", (event) => {
-            if (!event.candidate) return
-            peer.addIceCandidate(event.candidate)
-        })
+        // peer.addEventListener("icecandidate", (event) => {
+        //     if (!event.candidate) return
+        //     peer.addIceCandidate(event.candidate)
+        // })
 
         peer.addEventListener("iceconnectionstatechange", () => {
             switch (peer.iceConnectionState) {
@@ -70,12 +82,15 @@ class WebRTCClient {
 
     private async createAnswer(data: ISdpParams) {
         const peer = await this.createRTCPeer(data.targetId)
-        const answer = await peer.createAnswer()
         await peer.setRemoteDescription(data.sdp)
+        const answer = await peer.createAnswer()
         await peer.setLocalDescription(answer)
         socketService.sendAnswer({
             targetId: data.targetId,
-            sdp: data.sdp
+            userId: this.userId,
+            sdp: answer,
+            method: "answer",
+            roomId: this.roomId
         })
     }
 
@@ -86,20 +101,43 @@ class WebRTCClient {
             offerToReceiveVideo: true
         })
         await peer.setLocalDescription(offer)
+
         socketService.sendOffer({
             targetId,
-            sdp: offer
+            userId: this.userId,
+            sdp: offer,
+            method: "offer",
+            roomId: this.roomId
         })
+
+        // let done = false
+        // let g: any = null
+        // peer.addEventListener("icecandidate", (ev) => {
+        //     console.log(ev)
+        //     if (done) {
+        //         return
+        //     }
+        //     if (!g) {
+        //         g = setTimeout(() => {
+        //             done = true
+        //             g = null
+        //
+        //         }, 1000)
+        //     }
+        // })
+
     }
 
     public async joinRoom(info: IJoinInfo) {
         await this.getUserMedia()
-        // socketService.joinRoom({
-        //     username: info.username,
-        //     roomId: info.roomId,
-        //     videoStatus: info.videoStatus,
-        //     isHasAuth: this.isHasAuth
-        // })
+        this.roomId = info.roomId
+        socketService.joinRoom({
+            username: info.username,
+            roomId: info.roomId,
+            videoStatus: info.videoStatus,
+            isHasAuth: this.isHasAuth,
+            method: "joinRoom"
+        })
     }
 
     // 手机切换前后摄像头

@@ -3,18 +3,28 @@ import type {FC} from "react"
 import {RoomPCWrapper} from "@/views/room-pc/style";
 import WebRTCClient from "@/lib/webrtc-client";
 import eventBus from "@/lib/eventBus";
-import {EventName} from "@/service/type";
+import {EventName, INewClientParams} from "@/service/type";
+import storage from "@/utils/Storage";
 
+
+interface IUserInfo {
+    audioStatus: boolean
+    id: string
+    isHasAuth: boolean
+    name: string
+    videoStatus: boolean
+}
 
 const RoomPC: FC = () => {
     const videoRef = useRef<HTMLVideoElement>(null)
     const rtcClient = useRef<WebRTCClient | null>(null)
-    const [userList, setUserList] = useState<{}[]>([])
+    const [userList, setUserList] = useState<IUserInfo[]>([])
     const [videoStatus, setVideoStatus] = useState<boolean>(true)
     const [audioStatus, setAudioStatus] = useState<boolean>(false)
     const [speakerStatus, setSpeakerStatus] = useState<boolean>(false)
 
     useEffect(() => {
+        const roomInfo = storage.getItem("roomInfo")
         rtcClient.current = new WebRTCClient(videoRef.current!, {
             audio: true,
             video: {
@@ -28,20 +38,20 @@ const RoomPC: FC = () => {
             }
         })
         rtcClient.current.joinRoom({
-            username: "qiqi",
+            username: roomInfo.username,
             videoStatus: true,
-            roomId: "123"
+            roomId: roomInfo.roomId
         })
 
         eventBus.on(EventName.ON_JOIN_ROOM, (data) => {
-            console.log(EventName.ON_JOIN_ROOM, data)
-            userList.push(data.user)
-            setUserList([...userList])
-            rtcClient.current?.initRTC(data.userId)
+            rtcClient.current!.userId = data.user.id
+            setUserList(data.memberList)
         })
 
-        eventBus.on(EventName.ON_NEW_CLIENT, (data) => {
-            console.log(EventName.ON_NEW_CLIENT, data)
+        eventBus.on(EventName.ON_NEW_CLIENT, (data: INewClientParams) => {
+            userList.push(data.user)
+            setUserList([...userList])
+            rtcClient.current?.initRTC(data.user.id)
         })
 
         eventBus.on(EventName.ON_VIDEO_STATUS, (data) => {
@@ -82,7 +92,14 @@ const RoomPC: FC = () => {
     }
 
     return <RoomPCWrapper>
-        <video ref={videoRef} autoPlay></video>
+        <video ref={videoRef} id={"video_0"} autoPlay></video>
+        {
+            userList.map(user => {
+                return <div key={user.id}>
+                    <video id={"video_" + user.id} autoPlay></video>
+                </div>
+            })
+        }
     </RoomPCWrapper>
 }
 
