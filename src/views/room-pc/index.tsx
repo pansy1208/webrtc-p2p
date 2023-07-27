@@ -92,7 +92,7 @@ const RoomPC: FC = () => {
     }
 
     return <RoomPCWrapper>
-        <video ref={videoRef} id={"video_0"} autoPlay></video>
+        <video ref={videoRef} id={"video_0"} autoPlay muted></video>
         {
             userList.map(user => {
                 return <div key={user.id}>

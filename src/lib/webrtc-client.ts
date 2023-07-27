@@ -1,7 +1,7 @@
 import type {IJoinInfo} from "@/lib/type";
 import socketService from "@/service/socketService";
 import eventBus from "@/lib/eventBus";
-import {EventName, ISdpParams} from "@/service/type";
+import {EventName, IICEParams, ISdpParams} from "@/service/type";
 import "@/service/socketEvent"
 
 class WebRTCClient {
@@ -27,6 +27,10 @@ class WebRTCClient {
             const peer = this.peerMap.get(data.targetId)!
             await peer.setRemoteDescription(data.sdp)
         })
+        eventBus.on(EventName.ON_ICE_CANDIDATE, async (data: IICEParams) => {
+            const peer = this.peerMap.get(data.targetId)!
+            await peer.addIceCandidate(data.ice)
+        })
     }
 
     private async getUserMedia() {
@@ -42,15 +46,7 @@ class WebRTCClient {
     }
 
     private async createRTCPeer(targetId: string): Promise<RTCPeerConnection> {
-        const peer = new RTCPeerConnection({
-            iceServers: [{
-                username: "527meeting",
-                urls: "turn:firepocket.fans:30001?transport=tcp",
-                credential: "Ilove527meeting"
-            }],
-            iceTransportPolicy: "relay"
-        })
-
+        const peer = new RTCPeerConnection()
         this.peerMap.set(targetId, peer)
         if (this.myStream) {
             for (const track of this.myStream.getTracks()) {
@@ -63,12 +59,20 @@ class WebRTCClient {
             videoDom.srcObject = event.streams[0]
         })
 
-        // peer.addEventListener("icecandidate", (event) => {
-        //     if (!event.candidate) return
-        //     peer.addIceCandidate(event.candidate)
-        // })
+        peer.addEventListener("icecandidate", (event) => {
+            if (event.candidate) {
+                socketService.sendICE({
+                    targetId,
+                    userId: this.userId,
+                    roomId: this.roomId,
+                    method: "icecandidate",
+                    ice: event.candidate
+                })
+            }
+        })
 
         peer.addEventListener("iceconnectionstatechange", () => {
+            console.log('peer.iceConnectionState', peer.iceConnectionState)
             switch (peer.iceConnectionState) {
                 case "connected":
                     break
@@ -109,23 +113,6 @@ class WebRTCClient {
             method: "offer",
             roomId: this.roomId
         })
-
-        // let done = false
-        // let g: any = null
-        // peer.addEventListener("icecandidate", (ev) => {
-        //     console.log(ev)
-        //     if (done) {
-        //         return
-        //     }
-        //     if (!g) {
-        //         g = setTimeout(() => {
-        //             done = true
-        //             g = null
-        //
-        //         }, 1000)
-        //     }
-        // })
-
     }
 
     public async joinRoom(info: IJoinInfo) {

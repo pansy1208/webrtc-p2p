@@ -10,7 +10,8 @@ export enum EventName {
     ON_VIDEO_STATUS = "onVideoStatus",
     ON_AUDIO_STATUS = "onAudioStatus",
     ON_OFFER = "onOffer",
-    ON_ANSWER = "onAnswer"
+    ON_ANSWER = "onAnswer",
+    ON_ICE_CANDIDATE = "onICECandidate"
 }
 
 export interface IJoinParams {
@@ -44,4 +45,12 @@ export interface INewClientParams {
         name: string
     }
     method: "newClient"
+}
+
+export interface IICEParams {
+    roomId: string
+    targetId: string
+    userId: string
+    ice: RTCIceCandidate
+    method: "icecandidate"
 }

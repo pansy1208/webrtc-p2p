@@ -50,3 +50,10 @@ socket.registerEvent({
         eventBus.emit(EventName.ON_ANSWER, data)
     }
 })
+
+socket.registerEvent({
+    method: "icecandidate",
+    cb: (data) => {
+        eventBus.emit(EventName.ON_ICE_CANDIDATE, data)
+    }
+})

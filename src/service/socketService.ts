@@ -1,5 +1,6 @@
 import socket from "@/service/socket";
 import type {IJoinParams, IStatusParams, ISdpParams} from "@/service/type";
+import {IICEParams} from "@/service/type";
 
 class SocketService {
     public initSocket() {
@@ -27,6 +28,10 @@ class SocketService {
     }
 
     public sendAnswer(params: ISdpParams) {
+        socket.sendMessage(params)
+    }
+
+    public sendICE(params: IICEParams) {
         socket.sendMessage(params)
     }
 }
