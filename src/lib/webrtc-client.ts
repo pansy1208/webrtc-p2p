@@ -5,20 +5,22 @@ import {EventName, IICEParams, ISdpParams} from "@/service/type";
 import "@/service/socketEvent"
 
 class WebRTCClient {
-    private videoDom: HTMLVideoElement
     private myStream: MediaStream | null = null
     private peerMap: Map<string, RTCPeerConnection> = new Map()
     private roomId: string = ""
+    private isHasAuth: boolean = true
     public userId: string = ""
-    public isHasAuth: boolean = true
     public constraints: MediaStreamConstraints = {
         audio: true,
-        video: true
+        video: {
+            width: 640,
+            height: 480,
+            frameRate: 30
+        }
     }
 
-    constructor(videoDom: HTMLVideoElement, constraints?: MediaStreamConstraints) {
+    constructor(constraints?: MediaStreamConstraints) {
         socketService.initSocket()
-        this.videoDom = videoDom
         if (constraints) this.constraints = constraints
         eventBus.on(EventName.ON_OFFER, async (data: ISdpParams) => {
             await this.createAnswer(data)
@@ -37,7 +39,8 @@ class WebRTCClient {
         if (!this.myStream) {
             try {
                 this.myStream = await navigator.mediaDevices.getUserMedia(this.constraints)
-                this.videoDom.srcObject = this.myStream
+                const videoDom = document.getElementById("video_0") as HTMLVideoElement
+                videoDom.srcObject = this.myStream
             } catch (error) {
                 this.isHasAuth = false
                 console.error('getUserMedia error', error)

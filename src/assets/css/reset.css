@@ -18,3 +18,7 @@ div {
     padding: 0;
     box-sizing: border-box;
 }
+
+.hide {
+    display: none;
+}
