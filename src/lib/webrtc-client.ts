@@ -9,6 +9,8 @@ class WebRTCClient {
     private peerMap: Map<string, RTCPeerConnection> = new Map()
     private roomId: string = ""
     private isHasAuth: boolean = true
+    private localVideoDom: HTMLVideoElement
+    private isEnabled: boolean = true
     public userId: string = ""
     public constraints: MediaStreamConstraints = {
         audio: true,
@@ -20,6 +22,7 @@ class WebRTCClient {
     }
 
     constructor(constraints?: MediaStreamConstraints) {
+        this.localVideoDom = document.getElementById("video_0") as HTMLVideoElement
         socketService.initSocket()
         if (constraints) this.constraints = constraints
         eventBus.on(EventName.ON_OFFER, async (data: ISdpParams) => {
@@ -35,16 +38,13 @@ class WebRTCClient {
         })
     }
 
-    private async getUserMedia() {
-        if (!this.myStream) {
-            try {
-                this.myStream = await navigator.mediaDevices.getUserMedia(this.constraints)
-                const videoDom = document.getElementById("video_0") as HTMLVideoElement
-                videoDom.srcObject = this.myStream
-            } catch (error) {
-                this.isHasAuth = false
-                console.error('getUserMedia error', error)
-            }
+    private async getUserMedia(): Promise<MediaStream | null> {
+        try {
+            return await navigator.mediaDevices.getUserMedia(this.constraints)
+        } catch (error) {
+            this.isHasAuth = false
+            console.error('getUserMedia error', error)
+            return null
         }
     }
 
@@ -58,8 +58,13 @@ class WebRTCClient {
         }
         peer.addEventListener("track", (event) => {
             const videoDom = document.getElementById(`video_${targetId}`) as HTMLVideoElement
-            console.log(videoDom)
-            videoDom.srcObject = event.streams[0]
+            const audioDom = document.getElementById(`audio_${targetId}`) as HTMLAudioElement
+            const track = event.track
+            if (track.kind === "video") {
+                videoDom.srcObject = event.streams[0]
+            } else if (track.kind === "audio") {
+                audioDom.srcObject = event.streams[0]
+            }
         })
 
         peer.addEventListener("icecandidate", (event) => {
@@ -75,7 +80,6 @@ class WebRTCClient {
         })
 
         peer.addEventListener("iceconnectionstatechange", () => {
-            console.log('peer.iceConnectionState', peer.iceConnectionState)
             switch (peer.iceConnectionState) {
                 case "connected":
                     break
@@ -119,7 +123,10 @@ class WebRTCClient {
     }
 
     public async joinRoom(info: IJoinInfo) {
-        await this.getUserMedia()
+        this.myStream = await this.getUserMedia()
+        if (this.myStream) {
+            this.localVideoDom.srcObject = this.myStream
+        }
         this.roomId = info.roomId
         socketService.joinRoom({
             username: info.username,
@@ -143,6 +150,7 @@ class WebRTCClient {
     public changeCameraStatus(status: boolean) {
         if (this.myStream) {
             this.myStream.getVideoTracks()[0].enabled = status
+            this.isEnabled = status
         }
     }
 
@@ -154,9 +162,56 @@ class WebRTCClient {
 
     public async shareScreen() {
         try {
-            await navigator.mediaDevices.getDisplayMedia()
+            const screenStream = await navigator.mediaDevices.getDisplayMedia()
+            if (this.myStream) {
+                this.myStream.getVideoTracks().forEach(track => {
+                    track.stop()
+                })
+                this.myStream.removeTrack(this.myStream.getVideoTracks()[0])
+                this.myStream.addTrack(screenStream.getVideoTracks()[0])
+            } else {
+                this.localVideoDom.srcObject = screenStream
+            }
+            this.peerMap.forEach(peer => {
+                peer.getSenders().forEach(sender => {
+                    if (sender.track && sender.track.kind === "video") {
+                        sender.replaceTrack(screenStream.getVideoTracks()[0])
+                    }
+                })
+            })
         } catch (error) {
             console.error("play screen fail: ", error)
+        }
+    }
+
+    public async stopShareScreen() {
+        try {
+            const localStream = await this.getUserMedia()
+            if (this.myStream) {
+                this.myStream.getVideoTracks().forEach(track => {
+                    track.stop()
+                })
+                localStream!.getVideoTracks()[0].enabled = this.isEnabled
+                this.myStream.removeTrack(this.myStream.getVideoTracks()[0])
+                this.myStream.addTrack(localStream!.getVideoTracks()[0])
+            } else {
+                const screenStream = this.localVideoDom.srcObject as MediaStream
+                screenStream.getTracks().forEach(track => {
+                    track.stop()
+                })
+                if (localStream) {
+                    this.localVideoDom.srcObject = localStream
+                }
+            }
+            this.peerMap.forEach(peer => {
+                peer.getSenders().forEach(sender => {
+                    if (sender.track && sender.track.kind === "video") {
+                        sender.replaceTrack(localStream!.getVideoTracks()[0])
+                    }
+                })
+            })
+        } catch (error) {
+            console.error("stop screenShare fail: ", error)
         }
     }
 

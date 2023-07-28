@@ -1,4 +1,5 @@
 import {memo, useEffect, useRef, useState} from "react";
+import {useNavigate} from "react-router-dom";
 import type {FC} from "react"
 import classNames from "classnames";
 import {RoomPCWrapper} from "@/views/room-pc/style";
@@ -6,18 +7,18 @@ import WebRTCClient from "@/lib/webrtc-client";
 import eventBus from "@/lib/eventBus";
 import {EventName, INewClientParams} from "@/service/type";
 import storage from "@/utils/Storage";
-import mute from "@/assets/img/mic-mute.png"
-import unmute from "@/assets/img/mic-unmute.png"
+import mute from "@/assets/img/mic_mute.png"
+import unmute from "@/assets/img/mic_unmute.png"
 import exit from "@/assets/img/exit.png"
-import micoff from "@/assets/img/mic-off.png"
-import mic1 from "@/assets/img/mic1.png"
-import speackeroff from "@/assets/img/speaker_off.png"
-import speakeron1 from "@/assets/img/speaker_on1.png"
-import video1 from "@/assets/img/video1.png"
-import videooff from "@/assets/img/video-off.png"
+import mic_off from "@/assets/img/mic_off.png"
+import mic_on from "@/assets/img/mic_on.png"
+import speaker_off from "@/assets/img/speaker_off.png"
+import speaker_on from "@/assets/img/speaker_on.png"
+import video_on from "@/assets/img/video_on.png"
+import video_off from "@/assets/img/video_off.png"
 import warn from "@/assets/img/warn.svg"
-import defaultAvatar from "@/assets/img/defaultAvatar.jpg"
-import {useNavigate} from "react-router-dom";
+import defaultAvatar from "@/assets/img/defaultAvatar.svg"
+import screen_share from "@/assets/img/screen_share.png"
 
 
 interface IUserInfo {
@@ -60,7 +61,9 @@ const RoomPC: FC = () => {
         isHasAuth: true
     })
 
+    const areaBox = useRef<HTMLDivElement>(null)
     const [userList, setUserList] = useState<IUserInfo[]>([])
+    const useListRef = useRef<IUserInfo[]>(userList)
     const [videoStatus, setVideoStatus] = useState<boolean>(true)
     const [audioStatus, setAudioStatus] = useState<boolean>(false)
     const [speakerStatus, setSpeakerStatus] = useState<boolean>(false)
@@ -69,6 +72,9 @@ const RoomPC: FC = () => {
     const [isShowPlayTips, setIsShowPlayTips] = useState<boolean>(false)
     const [zoomIndex, setZoomIndex] = useState<number>(-1)
     const [currentZoomVideoId, setCurrentZoomVideoId] = useState("")
+    const [isLarge, setIsLarge] = useState<boolean>(false)
+    const [leaveUserId, setLeaveUserId] = useState<string>("")
+    const [isShareScreen, setIsShareScreen] = useState<boolean>(false)
     let width = videoWidth
     let height = videoHeight
 
@@ -87,12 +93,13 @@ const RoomPC: FC = () => {
             const list = data.memberList.filter(item => {
                 return item.id !== data.user.id
             })
+            useListRef.current = list
             setUserList(list)
         })
 
         eventBus.on(EventName.ON_NEW_CLIENT, (data: INewClientParams) => {
-            userList.push(data.user)
-            setUserList([...userList])
+            useListRef.current.push(data.user)
+            setUserList([...useListRef.current])
             rtcClient.current?.initRTC(data.user.id)
         })
 
@@ -106,12 +113,13 @@ const RoomPC: FC = () => {
 
         eventBus.on(EventName.ON_LEAVE, (data: { id: string }) => {
             console.log(EventName.ON_LEAVE, data)
-            userList.forEach((item, index) => {
+            setLeaveUserId(data.id)
+            useListRef.current.forEach((item, index) => {
                 if (item.id === data.id) {
-                    userList.splice(index, 1)
+                    useListRef.current.splice(index, 1)
                 }
             })
-            setUserList([...userList])
+            setUserList([...useListRef.current])
         })
 
         window.addEventListener("resize", resize)
@@ -124,9 +132,17 @@ const RoomPC: FC = () => {
     }, [])
 
     useEffect(() => {
-        console.log('成员列表发生变化')
-        initLayout()
-    },[userList])
+        if (zoomIndex === -1 || leaveUserId === currentZoomVideoId || userList.length === 0) {
+            setZoomIndex(-1)
+            setCurrentZoomVideoId("")
+            setLeaveUserId("")
+            let dom = areaBox.current
+            dom && dom.removeAttribute("style")
+            initLayout()
+        } else {
+            enlargeVideo()
+        }
+    }, [userList])
 
     const resize = () => {
         clientWidth = document.body.clientWidth
@@ -150,8 +166,13 @@ const RoomPC: FC = () => {
         setSpeakerStatus(!speakerStatus)
     }
 
-    const playShareScreen = () => {
-        rtcClient.current?.shareScreen()
+    const toggleScreenShare = () => {
+        setIsShareScreen(!isShareScreen)
+        if (!isShareScreen) {
+            rtcClient.current?.shareScreen()
+        } else {
+            rtcClient.current?.stopShareScreen()
+        }
     }
 
     const playAudio = () => {
@@ -275,11 +296,10 @@ const RoomPC: FC = () => {
         Object.keys(selectVideoStyle).forEach(item => {
             currentZoomStyleList[item] = selectVideoStyle[item]
         })
-
-        setZoomIndex(index)
     }
 
     const enlargeVideo = () => {
+        setIsLarge(true)
         let zoomDomArr = document.querySelectorAll(".video-box") as NodeListOf<HTMLElement>
 
         let largeWidth = clientHeight * scaleY
@@ -302,13 +322,11 @@ const RoomPC: FC = () => {
         surplusWidth = Math.floor(clientWidth - largeWidth - smallWidth) / 2
         surplusHeight = Math.floor(clientHeight - largeHeight) / 2
 
-        // nextTick(() => {
-        let zoomArea = document.querySelector(".zoom-area") as HTMLElement
+        let zoomArea = document.querySelector(".zoom-area") as HTMLDivElement
         zoomArea.style.height = largeHeight + 'px'
         zoomArea.style.width = largeWidth + smallWidth + 'px'
         zoomArea.style.top = surplusHeight + 'px'
         zoomArea.style.left = surplusWidth + 'px'
-        // })
 
         zoomDomArr.forEach((item, index) => {
             if (index === zoomIndex) {
@@ -336,26 +354,32 @@ const RoomPC: FC = () => {
     }
 
     const zoomVideo = (index: number, clientId: string) => {
-        let zoomDomArr = document.querySelectorAll(".video-box") as NodeListOf<HTMLElement>
+        let zoomDomArr = document.querySelectorAll(".video-box") as NodeListOf<HTMLDivElement>
         let length = zoomDomArr.length
         if (length === 1) return
         if (index === zoomIndex) {
-            let dom = document.querySelector(".zoom-area") as HTMLElement
+            let dom = document.querySelector(".zoom-area") as HTMLDivElement
             dom.removeAttribute("style")
             setZoomIndex(-1)
+            setIsLarge(false)
             setCurrentZoomVideoId("")
-            initLayout()
             return;
         }
 
-        if (zoomIndex > -1) {
+        setZoomIndex(index)
+        if (zoomIndex > -1 && isLarge) {
             exchangeStyle(index)
-        } else {
-            setZoomIndex(index)
-            enlargeVideo()
         }
         setCurrentZoomVideoId(clientId)
     }
+
+    useEffect(() => {
+        if (zoomIndex === -1) {
+            initLayout()
+        } else if (!isLarge) {
+            enlargeVideo()
+        }
+    }, [zoomIndex])
 
     const leave = () => {
         navigate(-1)
@@ -363,7 +387,7 @@ const RoomPC: FC = () => {
 
     return <RoomPCWrapper>
         <div className={"container"}>
-            <div className={classNames(zoomIndex === -1 ? 'video-area' : 'zoom-area')}>
+            <div className={classNames(zoomIndex === -1 ? 'video-area' : 'zoom-area')} ref={areaBox}>
                 <div className="video-box self-video" onClick={() => zoomVideo(0, 'selfVideo')}>
                     <video id={"video_0"} className={classNames(!videoStatus || !client.isHasAuth ? "hide" : "")} muted
                            autoPlay></video>
@@ -385,7 +409,7 @@ const RoomPC: FC = () => {
                             <div className="info">
                                 <span>
                                     {
-                                        user.audioStatus ? <img src={mute} alt=""/> : <img src={unmute} alt=""/>
+                                        !user.audioStatus ? <img src={mute} alt=""/> : <img src={unmute} alt=""/>
                                     }
                                     {user.name}
                                 </span>
@@ -399,7 +423,7 @@ const RoomPC: FC = () => {
             <div onClick={toggleAudio}>
                 <div style={{background: !audioStatus ? '#fff' : ''}}>
                     {
-                        audioStatus ? <img src={micoff} alt=""/> : <img src={mic1} alt=""/>
+                        audioStatus ? <img src={mic_off} alt=""/> : <img src={mic_on} alt=""/>
                     }
 
                 </div>
@@ -408,8 +432,8 @@ const RoomPC: FC = () => {
             <div onClick={toggleSpeaker}>
                 <div style={{background: !speakerStatus ? '#fff' : ''}}>
                     {
-                        speakerStatus ? <img src={speackeroff} alt=""/> :
-                            <img src={speakeron1} alt=""/>
+                        speakerStatus ? <img src={speaker_off} alt=""/> :
+                            <img src={speaker_on} alt=""/>
                     }
                 </div>
                 <span>{speakerStatus ? "扬声器已关" : "扬声器已开"}</span>
@@ -417,11 +441,17 @@ const RoomPC: FC = () => {
             <div onClick={toggleVideo}>
                 <div style={{background: videoStatus ? '#fff' : ''}}>
                     {
-                        videoStatus ? <img src={video1} alt=""/> :
-                            <img src={videooff} alt=""/>
+                        videoStatus ? <img src={video_on} alt=""/> :
+                            <img src={video_off} alt=""/>
                     }
                 </div>
                 <span>{videoStatus ? "摄像头已开" : "摄像头已关"}</span>
+            </div>
+            <div onClick={toggleScreenShare}>
+                <div style={{background: "#fff"}}>
+                    <img src={screen_share} alt={""}/>
+                </div>
+                <span>{isShareScreen ? "关闭分享" : "屏幕分享"}</span>
             </div>
             <div className="exit" onClick={leave}>
                 <div>
