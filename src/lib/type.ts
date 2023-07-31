@@ -10,3 +10,8 @@ export interface IJoinInfo {
     username: string
     videoStatus: boolean
 }
+
+export interface IRTCConnectionParams {
+    iceTransportPolicy?:  RTCIceTransportPolicy
+    iceServer?: RTCIceServer[]
+}

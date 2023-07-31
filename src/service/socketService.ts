@@ -15,11 +15,7 @@ class SocketService {
         socket.sendMessage(params)
     }
 
-    public changeVideoStatus(params: IStatusParams) {
-        socket.sendMessage(params)
-    }
-
-    public changeAudioStatus(params: IStatusParams) {
+    public changeVideoOrAudioStatus(params: IStatusParams) {
         socket.sendMessage(params)
     }
 
@@ -32,6 +28,10 @@ class SocketService {
     }
 
     public sendICE(params: IICEParams) {
+        socket.sendMessage(params)
+    }
+
+    public playShareScreen(params: IStatusParams) {
         socket.sendMessage(params)
     }
 }

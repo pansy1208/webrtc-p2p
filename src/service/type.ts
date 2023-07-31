@@ -11,21 +11,24 @@ export enum EventName {
     ON_AUDIO_STATUS = "onAudioStatus",
     ON_OFFER = "onOffer",
     ON_ANSWER = "onAnswer",
-    ON_ICE_CANDIDATE = "onICECandidate"
+    ON_ICE_CANDIDATE = "onICECandidate",
+    ON_SHARE_SCREEN = "onShareScreen"
 }
 
 export interface IJoinParams {
     username: string
     isHasAuth: boolean
     videoStatus: boolean
+    audioStatus: boolean
     roomId: string
     method: "joinRoom"
 }
 
 export interface IStatusParams {
+    roomId: string
     userId: string
     status: boolean
-    method: "videoStatus" | "audioStatus"
+    method: "videoStatus" | "audioStatus" | "shareScreen"
 }
 
 export interface ISdpParams {
@@ -36,14 +39,17 @@ export interface ISdpParams {
     method: "offer" | "answer"
 }
 
+export interface IUserInfo {
+    audioStatus: boolean
+    id: string
+    isHasAuth: boolean
+    name: string
+    videoStatus: boolean
+    isShareScreen: boolean
+}
+
 export interface INewClientParams {
-    user: {
-        videoStatus: boolean
-        audioStatus: boolean
-        id: string
-        isHasAuth: true
-        name: string
-    }
+    user: IUserInfo
     method: "newClient"
 }
 

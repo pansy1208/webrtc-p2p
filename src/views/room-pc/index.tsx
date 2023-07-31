@@ -4,8 +4,9 @@ import type {FC} from "react"
 import classNames from "classnames";
 import {RoomPCWrapper} from "@/views/room-pc/style";
 import WebRTCClient from "@/lib/webrtc-client";
+import type {IRTCConnectionParams} from "@/lib/type";
 import eventBus from "@/lib/eventBus";
-import {EventName, INewClientParams} from "@/service/type";
+import {EventName, INewClientParams, IStatusParams, IUserInfo} from "@/service/type";
 import storage from "@/utils/Storage";
 import mute from "@/assets/img/mic_mute.png"
 import unmute from "@/assets/img/mic_unmute.png"
@@ -19,15 +20,6 @@ import video_off from "@/assets/img/video_off.png"
 import warn from "@/assets/img/warn.svg"
 import defaultAvatar from "@/assets/img/defaultAvatar.svg"
 import screen_share from "@/assets/img/screen_share.png"
-
-
-interface IUserInfo {
-    audioStatus: boolean
-    id: string
-    isHasAuth: boolean
-    name: string
-    videoStatus: boolean
-}
 
 interface IJoinResult {
     memberList: IUserInfo[]
@@ -58,29 +50,47 @@ const RoomPC: FC = () => {
         name: "",
         videoStatus: true,
         audioStatus: true,
-        isHasAuth: true
+        isHasAuth: true,
+        isShareScreen: false
     })
+    const clientRef = useRef<IUserInfo>(client)
 
     const areaBox = useRef<HTMLDivElement>(null)
     const [userList, setUserList] = useState<IUserInfo[]>([])
-    const useListRef = useRef<IUserInfo[]>(userList)
+    const userListRef = useRef<IUserInfo[]>(userList)
     const [videoStatus, setVideoStatus] = useState<boolean>(true)
     const [audioStatus, setAudioStatus] = useState<boolean>(false)
     const [speakerStatus, setSpeakerStatus] = useState<boolean>(false)
     const [isShowErrorTip, setIsShowErrorTip] = useState<boolean>(false)
-    const [message, setMessage] = useState<boolean>(false)
+    const [message, setMessage] = useState<string>("")
     const [isShowPlayTips, setIsShowPlayTips] = useState<boolean>(false)
     const [zoomIndex, setZoomIndex] = useState<number>(-1)
     const [currentZoomVideoId, setCurrentZoomVideoId] = useState("")
     const [isLarge, setIsLarge] = useState<boolean>(false)
     const [leaveUserId, setLeaveUserId] = useState<string>("")
-    const [isShareScreen, setIsShareScreen] = useState<boolean>(false)
     let width = videoWidth
     let height = videoHeight
 
     useEffect(() => {
         const roomInfo = storage.getItem("roomInfo")
-        rtcClient.current = new WebRTCClient()
+        const turnInfo = storage.getItem("turnInfo", true)
+        const videoDom = document.getElementById("video_0") as HTMLVideoElement
+        let timeoutIndex: number
+        let turnServer: IRTCConnectionParams
+        if (turnInfo) {
+            turnServer = {
+                iceTransportPolicy: turnInfo.iceTransportPolicy,
+                iceServer: [{
+                    urls: turnInfo.turnServer,
+                    username: turnInfo.turnAccount,
+                    credential: turnInfo.turnPassword
+                }]
+            }
+        } else {
+            turnServer = {}
+        }
+
+        rtcClient.current = new WebRTCClient(videoDom, turnServer)
         rtcClient.current.joinRoom({
             username: roomInfo.username,
             videoStatus: true,
@@ -90,36 +100,79 @@ const RoomPC: FC = () => {
         eventBus.on(EventName.ON_JOIN_ROOM, (data: IJoinResult) => {
             rtcClient.current!.userId = data.user.id
             setClient(data.user)
+            clientRef.current = data.user
             const list = data.memberList.filter(item => {
                 return item.id !== data.user.id
             })
-            useListRef.current = list
+            userListRef.current = list
             setUserList(list)
         })
 
         eventBus.on(EventName.ON_NEW_CLIENT, (data: INewClientParams) => {
-            useListRef.current.push(data.user)
-            setUserList([...useListRef.current])
+            userListRef.current.push(data.user)
+            setUserList([...userListRef.current])
             rtcClient.current?.initRTC(data.user.id)
         })
 
-        eventBus.on(EventName.ON_VIDEO_STATUS, (data) => {
-            console.log(EventName.ON_VIDEO_STATUS, data)
+        eventBus.on(EventName.ON_VIDEO_STATUS, (data: IStatusParams) => {
+            for (let i = 0; i < userListRef.current.length; i++) {
+                if (userListRef.current[i].id === data.userId) {
+                    userListRef.current[i].videoStatus = data.status
+                    break
+                }
+            }
+            setUserList([...userListRef.current])
         })
 
-        eventBus.on(EventName.ON_AUDIO_STATUS, (data) => {
+        eventBus.on(EventName.ON_AUDIO_STATUS, (data: IStatusParams) => {
             console.log(EventName.ON_AUDIO_STATUS, data)
+            for (let i = 0; i < userListRef.current.length; i++) {
+                if (userListRef.current[i].id === data.userId) {
+                    userListRef.current[i].audioStatus = data.status
+                    break
+                }
+            }
+            setUserList([...userListRef.current])
         })
 
         eventBus.on(EventName.ON_LEAVE, (data: { id: string }) => {
             console.log(EventName.ON_LEAVE, data)
             setLeaveUserId(data.id)
-            useListRef.current.forEach((item, index) => {
+            userListRef.current.forEach((item, index) => {
                 if (item.id === data.id) {
-                    useListRef.current.splice(index, 1)
+                    userListRef.current.splice(index, 1)
                 }
             })
-            setUserList([...useListRef.current])
+            setUserList([...userListRef.current])
+        })
+
+        eventBus.on(EventName.ON_SHARE_SCREEN, (data) => {
+            if (data.userId === clientRef.current.id) {
+                clientRef.current.isShareScreen = data.status
+                setClient({...clientRef.current})
+            } else {
+                for (let i = 0; i < userListRef.current.length; i++) {
+                    if (userListRef.current[i].id === data.userId) {
+                        userListRef.current[i].isShareScreen = data.status
+                        break
+                    }
+                }
+                setUserList([...userListRef.current])
+            }
+        })
+
+        eventBus.on("onNetworkError", (data: 1000 | 1001) => {
+            clearTimeout(timeoutIndex)
+            setIsShowErrorTip(true)
+            setMessage("网络连接异常")
+            if (data === 1001) {
+                leave()
+            } else {
+                timeoutIndex = window.setTimeout(() => {
+                    setIsShowErrorTip(false)
+                    setMessage("")
+                }, 3000)
+            }
         })
 
         window.addEventListener("resize", resize)
@@ -152,12 +205,13 @@ const RoomPC: FC = () => {
     }
 
     const toggleVideo = () => {
-        let status = !videoStatus
-        setVideoStatus(status)
-        rtcClient.current?.changeCameraStatus(status)
+        if (!client.isHasAuth) return
+        rtcClient.current?.changeCameraStatus(!videoStatus)
+        setVideoStatus(!videoStatus)
     }
 
     const toggleAudio = () => {
+        if (!client.isHasAuth) return
         setAudioStatus(!audioStatus)
         rtcClient.current?.changeMicrophoneStatus(audioStatus)
     }
@@ -167,9 +221,8 @@ const RoomPC: FC = () => {
     }
 
     const toggleScreenShare = () => {
-        setIsShareScreen(!isShareScreen)
-        if (!isShareScreen) {
-            rtcClient.current?.shareScreen()
+        if (!client.isShareScreen) {
+            rtcClient.current?.playShareScreen()
         } else {
             rtcClient.current?.stopShareScreen()
         }
@@ -389,10 +442,14 @@ const RoomPC: FC = () => {
         <div className={"container"}>
             <div className={classNames(zoomIndex === -1 ? 'video-area' : 'zoom-area')} ref={areaBox}>
                 <div className="video-box self-video" onClick={() => zoomVideo(0, 'selfVideo')}>
-                    <video id={"video_0"} className={classNames(!videoStatus || !client.isHasAuth ? "hide" : "")} muted
+                    <video id={"video_0"}
+                           className={classNames((!videoStatus || !client.isHasAuth) && !client.isShareScreen ? "hide" : "")}
+                           muted
                            autoPlay></video>
-                    <img className={classNames("bg", videoStatus && client.isHasAuth ? "hide" : "")} src={defaultAvatar}
-                         alt=""/>
+                    <img
+                        className={classNames("bg", (videoStatus && client.isHasAuth) || client.isShareScreen ? "hide" : "")}
+                        src={defaultAvatar}
+                        alt=""/>
                     <div className="info">
                         <span>{client.name}</span>
                     </div>
@@ -400,11 +457,11 @@ const RoomPC: FC = () => {
                 {
                     userList.map((user, index) => {
                         return <div className="video-box" onClick={() => zoomVideo(index + 1, user.id)} key={user.id}>
-                            {
-                                user.videoStatus && user.isHasAuth ?
-                                    <video id={"video_" + user.id} muted autoPlay></video> :
-                                    <img className="bg" src={defaultAvatar} alt=""/>
-                            }
+                            <video id={"video_" + user.id}
+                                   className={classNames(!user.videoStatus && !user.isShareScreen ? "hide" : "")} muted
+                                   autoPlay></video>
+                            <img className={classNames("bg", user.videoStatus || user.isShareScreen ? "hide" : "")}
+                                 src={defaultAvatar} alt=""/>
                             <audio className="hide" id={"audio_" + user.id} muted={speakerStatus} autoPlay></audio>
                             <div className="info">
                                 <span>
@@ -421,7 +478,7 @@ const RoomPC: FC = () => {
         </div>
         <div className={"footer"}>
             <div onClick={toggleAudio}>
-                <div style={{background: !audioStatus ? '#fff' : ''}}>
+                <div style={{background: !audioStatus ? "#fff" : "", opacity: client.isHasAuth ? "" : "0.5"}}>
                     {
                         audioStatus ? <img src={mic_off} alt=""/> : <img src={mic_on} alt=""/>
                     }
@@ -439,7 +496,7 @@ const RoomPC: FC = () => {
                 <span>{speakerStatus ? "扬声器已关" : "扬声器已开"}</span>
             </div>
             <div onClick={toggleVideo}>
-                <div style={{background: videoStatus ? '#fff' : ''}}>
+                <div style={{background: videoStatus ? "#fff" : "", opacity: client.isHasAuth ? "" : "0.5"}}>
                     {
                         videoStatus ? <img src={video_on} alt=""/> :
                             <img src={video_off} alt=""/>
@@ -451,7 +508,7 @@ const RoomPC: FC = () => {
                 <div style={{background: "#fff"}}>
                     <img src={screen_share} alt={""}/>
                 </div>
-                <span>{isShareScreen ? "关闭分享" : "屏幕分享"}</span>
+                <span>{client.isShareScreen ? "关闭分享" : "屏幕分享"}</span>
             </div>
             <div className="exit" onClick={leave}>
                 <div>
@@ -465,7 +522,7 @@ const RoomPC: FC = () => {
         }
         {
             !client.isHasAuth && !isShowErrorTip ?
-                <div className="tips">摄像头和麦克风没有权限或不存在</div> : null
+                <div className="tips">摄像头和麦克风不存在或没有权限</div> : null
         }
 
         {

@@ -12,7 +12,7 @@ interface ITurnInfo {
     turnServer: string
     turnAccount: string
     turnPassword: string
-    isRelay: boolean
+    iceTransportPolicy: "all" | "relay"
 }
 
 interface IRoomInfo {
@@ -29,20 +29,21 @@ const Home: FC = () => {
     const [isMore, setIsMore] = useState(true)
     const [roomType, setRoomType] = useState(0)
     const [isOpen, setIsOpen] = useState(false)
-    const [isRelay, setIsRelay] = useState(false)
     const [isTurn, setIsTurn] = useState(false)
+    const [iceTransportPolicy, setIceTransportPolicy] = useState<"all" | "relay">("all")
     const form = useRef<FormInstance>(null)
 
     useEffect(() => {
         const turnInfo = storage.getItem("turnInfo", true)
         if (turnInfo) {
             setIsTurn(true)
+            setIceTransportPolicy(turnInfo.iceTransportPolicy)
             form.current!.setFieldsValue({
                 turnServer: turnInfo.turnServer,
                 turnAccount: turnInfo.turnAccount,
-                turnPassword: turnInfo.turnPassword
+                turnPassword: turnInfo.turnPassword,
+                iceTransportPolicy: turnInfo.iceTransportPolicy
             })
-            setIsRelay(turnInfo.isRelay)
         }
     }, [])
 
@@ -62,8 +63,8 @@ const Home: FC = () => {
         setIsTurn(e.target.checked)
     }
 
-    const onRelayChange = (e: CheckboxChangeEvent) => {
-        setIsRelay(e.target.checked)
+    const onIceChange = (e: RadioChangeEvent) => {
+        setIceTransportPolicy(e.target.value)
     }
 
     const enterRoom = (data: IRoomInfo) => {
@@ -72,7 +73,7 @@ const Home: FC = () => {
                 turnServer: data.turnServer!,
                 turnAccount: data.turnAccount!,
                 turnPassword: data.turnPassword!,
-                isRelay: isRelay
+                iceTransportPolicy: iceTransportPolicy
             }
             storage.setItem("turnInfo", turnInfo, true)
         } else {
@@ -153,7 +154,10 @@ const Home: FC = () => {
                                 <Input placeholder={"请输入Turn服务密码"}/>
                             </Form.Item>
                             <Form.Item>
-                                <Checkbox checked={isRelay} onChange={onRelayChange}>IceTransportPolicy</Checkbox>
+                                <Radio.Group onChange={onIceChange} value={iceTransportPolicy}>
+                                    <Radio value={"all"}>All</Radio>
+                                    <Radio value={"relay"}>Relay</Radio>
+                                </Radio.Group>
                             </Form.Item>
                         </> : null
                     }

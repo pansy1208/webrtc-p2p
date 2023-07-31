@@ -57,3 +57,10 @@ socket.registerEvent({
         eventBus.emit(EventName.ON_ICE_CANDIDATE, data)
     }
 })
+
+socket.registerEvent({
+    method: "shareScreen",
+    cb: (data) => {
+        eventBus.emit(EventName.ON_SHARE_SCREEN, data)
+    }
+})
