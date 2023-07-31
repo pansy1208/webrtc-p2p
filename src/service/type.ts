@@ -24,6 +24,13 @@ export interface IJoinParams {
     method: "joinRoom"
 }
 
+export interface IJoinResult {
+    memberList: IUserInfo[]
+    startTime: number
+    roomId: string
+    user: IUserInfo
+}
+
 export interface IStatusParams {
     roomId: string
     userId: string

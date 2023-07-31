@@ -6,7 +6,7 @@ import {RoomPCWrapper} from "@/views/room-pc/style";
 import WebRTCClient from "@/lib/webrtc-client";
 import type {IRTCConnectionParams} from "@/lib/type";
 import eventBus from "@/lib/eventBus";
-import {EventName, INewClientParams, IStatusParams, IUserInfo} from "@/service/type";
+import {EventName, INewClientParams, IStatusParams, IUserInfo, IJoinResult} from "@/service/type";
 import storage from "@/utils/Storage";
 import mute from "@/assets/img/mic_mute.png"
 import unmute from "@/assets/img/mic_unmute.png"
@@ -20,13 +20,6 @@ import video_off from "@/assets/img/video_off.png"
 import warn from "@/assets/img/warn.svg"
 import defaultAvatar from "@/assets/img/defaultAvatar.svg"
 import screen_share from "@/assets/img/screen_share.png"
-
-interface IJoinResult {
-    memberList: IUserInfo[]
-    startTime: number
-    roomId: string
-    user: IUserInfo
-}
 
 const RoomPC: FC = () => {
     const scaleX = 3 / 4
@@ -136,7 +129,6 @@ const RoomPC: FC = () => {
         })
 
         eventBus.on(EventName.ON_LEAVE, (data: { id: string }) => {
-            console.log(EventName.ON_LEAVE, data)
             setLeaveUserId(data.id)
             userListRef.current.forEach((item, index) => {
                 if (item.id === data.id) {

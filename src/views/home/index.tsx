@@ -87,7 +87,7 @@ const Home: FC = () => {
             username: data.username
         })
 
-        if (utils.isPhone()) {
+        if (!utils.isPhone()) {
             navigate('/room-phone')
         } else {
             navigate('/room-pc')
