@@ -20,6 +20,7 @@ import video_off from "@/assets/img/video_off.png"
 import warn from "@/assets/img/warn.svg"
 import defaultAvatar from "@/assets/img/defaultAvatar.svg"
 import screen_share from "@/assets/img/screen_share.png"
+import utils from "@/utils/Utils";
 
 const RoomPC: FC = () => {
     const scaleX = 3 / 4
@@ -51,22 +52,26 @@ const RoomPC: FC = () => {
     const areaBox = useRef<HTMLDivElement>(null)
     const [userList, setUserList] = useState<IUserInfo[]>([])
     const userListRef = useRef<IUserInfo[]>(userList)
-    const [videoStatus, setVideoStatus] = useState<boolean>(true)
-    const [audioStatus, setAudioStatus] = useState<boolean>(false)
-    const [speakerStatus, setSpeakerStatus] = useState<boolean>(false)
-    const [isShowErrorTip, setIsShowErrorTip] = useState<boolean>(false)
-    const [message, setMessage] = useState<string>("")
-    const [isShowPlayTips, setIsShowPlayTips] = useState<boolean>(false)
-    const [zoomIndex, setZoomIndex] = useState<number>(-1)
+    const [roomType, setRoomType] = useState(1)
+    const [videoStatus, setVideoStatus] = useState(true)
+    const [audioStatus, setAudioStatus] = useState(false)
+    const [speakerStatus, setSpeakerStatus] = useState(false)
+    const [isShowErrorTip, setIsShowErrorTip] = useState(false)
+    const [message, setMessage] = useState("")
+    const [isShowPlayTips, setIsShowPlayTips] = useState(false)
+    const [zoomIndex, setZoomIndex] = useState(-1)
     const [currentZoomVideoId, setCurrentZoomVideoId] = useState("")
-    const [isLarge, setIsLarge] = useState<boolean>(false)
-    const [leaveUserId, setLeaveUserId] = useState<string>("")
+    const [isLarge, setIsLarge] = useState(false)
+    const [leaveUserId, setLeaveUserId] = useState("")
     let width = videoWidth
     let height = videoHeight
 
     useEffect(() => {
         const roomInfo = storage.getItem("roomInfo")
         const turnInfo = storage.getItem("turnInfo", true)
+        const isVideo = roomInfo.roomType === 1
+        setRoomType(roomInfo.roomType)
+        setVideoStatus(isVideo)
         const videoDom = document.getElementById("video_0") as HTMLVideoElement
         let timeoutIndex: number
         let turnServer: IRTCConnectionParams
@@ -83,14 +88,24 @@ const RoomPC: FC = () => {
             turnServer = {}
         }
 
-        rtcClient.current = new WebRTCClient(videoDom, turnServer)
+        rtcClient.current = new WebRTCClient(videoDom, turnServer, {
+            audio: true,
+            video: isVideo ? {
+                width: 640,
+                height: 480,
+                frameRate: 30
+            } : false
+        })
         rtcClient.current.joinRoom({
             username: roomInfo.username,
-            videoStatus: true,
+            videoStatus: isVideo && roomInfo.openCamera,
             roomId: roomInfo.roomId
         })
 
         eventBus.on(EventName.ON_JOIN_ROOM, (data: IJoinResult) => {
+            if (!data.user.videoStatus && isVideo) {
+                toggleVideo()
+            }
             rtcClient.current!.userId = data.user.id
             setClient(data.user)
             clientRef.current = data.user
@@ -315,32 +330,7 @@ const RoomPC: FC = () => {
 
     const exchangeStyle = (index: number) => {
         let zoomDomArr = document.querySelectorAll(".video-box") as NodeListOf<HTMLElement>
-
-        let currentBigVideoStyle: any = {}
-        let selectVideoStyle: any = {}
-
-        let currentZoomStyleList: any = zoomDomArr[zoomIndex].style
-        let selectVideoStyleList: any = zoomDomArr[index].style
-
-        for (let key of currentZoomStyleList) {
-            currentBigVideoStyle[key] = currentZoomStyleList[key]
-        }
-
-        for (let key of selectVideoStyleList) {
-            selectVideoStyle[key] = selectVideoStyleList[key]
-        }
-
-        zoomDomArr[zoomIndex].removeAttribute("style")
-        zoomDomArr[zoomIndex].classList.remove("bigVideo")
-        zoomDomArr[index].removeAttribute("style")
-        zoomDomArr[index].classList.add("bigVideo")
-
-        Object.keys(currentBigVideoStyle).forEach(item => {
-            selectVideoStyleList[item] = currentBigVideoStyle[item]
-        })
-        Object.keys(selectVideoStyle).forEach(item => {
-            currentZoomStyleList[item] = selectVideoStyle[item]
-        })
+        utils.exchangeStyle(zoomDomArr, zoomIndex, index)
     }
 
     const enlargeVideo = () => {

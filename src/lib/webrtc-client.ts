@@ -177,8 +177,9 @@ class WebRTCClient {
         })
     }
 
-    public getDeviceList() {
-
+    public async getDeviceList(): Promise<[]> {
+        const deviceList = await navigator.mediaDevices.enumerateDevices()
+        return []
     }
 
     // pc切换摄像头

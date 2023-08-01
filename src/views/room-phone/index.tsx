@@ -20,6 +20,7 @@ import video_off from "@/assets/img/video_off.png"
 import defaultAvatar from "@/assets/img/defaultAvatar.svg"
 import reverseCamera from "@/assets/img/reverse.png"
 import reverseCameraWhite from "@/assets/img/reverse_white.png"
+import utils from "@/utils/Utils";
 
 const RoomPhone: FC = () => {
     const navigate = useNavigate()
@@ -87,11 +88,14 @@ const RoomPhone: FC = () => {
         })
         rtcClient.current?.joinRoom({
             username: roomInfo.username,
-            videoStatus: isVideo,
+            videoStatus: isVideo && roomInfo.openCamera,
             roomId: roomInfo.roomId
         })
 
         eventBus.on(EventName.ON_JOIN_ROOM, (data: IJoinResult) => {
+            if (!data.user.videoStatus && isVideo) {
+                toggleVideo()
+            }
             rtcClient.current!.userId = data.user.id
             setClient(data.user)
             clientRef.current = data.user
@@ -208,7 +212,6 @@ const RoomPhone: FC = () => {
         length = length + 1
         let width: number
         if (meetingType === 0) {
-            let zoomDomArr = document.querySelectorAll(".video-box") as NodeListOf<HTMLElement>
             zoomDomArr.forEach(item => {
                 item.removeAttribute("style")
             })
@@ -230,30 +233,7 @@ const RoomPhone: FC = () => {
 
     const exchangeStyle = (index: number) => {
         let zoomDomArr = document.querySelectorAll(".video-box") as NodeListOf<HTMLElement>
-
-        let currentBigVideoStyle: any = {}
-        let selectVideoStyle: any = {}
-
-        let currentZoomStyleList: any = zoomDomArr[zoomIndex].style
-        let selectVideoStyleList: any = zoomDomArr[index].style
-
-        for (let key of currentZoomStyleList) {
-            currentBigVideoStyle[key] = currentZoomStyleList[key]
-        }
-
-        for (let key of selectVideoStyleList) {
-            selectVideoStyle[key] = selectVideoStyleList[key]
-        }
-
-        zoomDomArr[zoomIndex].removeAttribute("style")
-        zoomDomArr[index].removeAttribute("style")
-
-        Object.keys(currentBigVideoStyle).forEach(item => {
-            selectVideoStyleList[item] = currentBigVideoStyle[item]
-        })
-        Object.keys(selectVideoStyle).forEach(item => {
-            currentZoomStyleList[item] = selectVideoStyle[item]
-        })
+        utils.exchangeStyle(zoomDomArr, zoomIndex, index)
     }
 
     const enlargeVideo = () => {
