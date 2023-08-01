@@ -82,7 +82,7 @@ const Home: FC = () => {
         storage.setItem("roomInfo", {
             roomType,
             openCamera: isOpen,
-            manyPeople: isMore,
+            meetingType: isMore,
             roomId: data.roomId,
             username: data.username
         })

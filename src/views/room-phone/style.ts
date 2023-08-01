@@ -38,6 +38,10 @@ export const RoomPhoneWrapper = styled.div`
     .info {
       width: 20%;
       text-align: center;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
 
       img {
         width: 100%;

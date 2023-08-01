@@ -1,9 +1,14 @@
 import {memo, useEffect, useRef, useState} from "react";
 import type {FC} from "react"
+import {useNavigate} from "react-router-dom";
 import {RoomPhoneWrapper} from "@/views/room-phone/style";
 import classNames from "classnames";
-import type {IJoinResult, IUserInfo} from "@/service/type";
+import type {IJoinResult, IUserInfo, INewClientParams, IStatusParams} from "@/service/type";
+import type {IRTCConnectionParams} from "@/lib/type";
+import eventBus from "@/lib/eventBus";
+import {EventName} from "@/service/type";
 import WebRTCClient from "@/lib/webrtc-client";
+import storage from "@/utils/Storage";
 import mute from "@/assets/img/mic_mute.png"
 import exit from "@/assets/img/exit.png"
 import mic_off from "@/assets/img/mic_off.png"
@@ -12,14 +17,9 @@ import speaker_off from "@/assets/img/speaker_off.png"
 import speaker_on from "@/assets/img/speaker_on.png"
 import video_on from "@/assets/img/video_on.png"
 import video_off from "@/assets/img/video_off.png"
-import warn from "@/assets/img/warn.svg"
 import defaultAvatar from "@/assets/img/defaultAvatar.svg"
 import reverseCamera from "@/assets/img/reverse.png"
-import storage from "@/utils/Storage";
-import {useNavigate} from "react-router-dom";
-import {IRTCConnectionParams} from "@/lib/type";
-import eventBus from "@/lib/eventBus";
-import {EventName, INewClientParams, IStatusParams} from "@/service/type";
+import reverseCameraWhite from "@/assets/img/reverse_white.png"
 
 const RoomPhone: FC = () => {
     const navigate = useNavigate()
@@ -58,6 +58,10 @@ const RoomPhone: FC = () => {
 
     useEffect(() => {
         const roomInfo = storage.getItem("roomInfo")
+        const isVideo = roomInfo.roomType === 1
+        setRoomType(roomInfo.roomType)
+        setVideoStatus(isVideo)
+        setMeetingType(roomInfo.meetingType ? 1 : 0)
         const turnInfo = storage.getItem("turnInfo", true)
         let turnServer: IRTCConnectionParams
         if (turnInfo) {
@@ -73,10 +77,17 @@ const RoomPhone: FC = () => {
             turnServer = {}
         }
         const videoDom = document.getElementById("video_0") as HTMLVideoElement
-        rtcClient.current = new WebRTCClient(videoDom, turnServer)
+        rtcClient.current = new WebRTCClient(videoDom, turnServer, {
+            audio: true,
+            video: isVideo ? {
+                width: 640,
+                height: 480,
+                frameRate: 30
+            } : false
+        })
         rtcClient.current?.joinRoom({
             username: roomInfo.username,
-            videoStatus: true,
+            videoStatus: isVideo,
             roomId: roomInfo.roomId
         })
 
@@ -125,19 +136,8 @@ const RoomPhone: FC = () => {
                     userListRef.current.splice(index, 1)
                 }
             })
-            if (zoomIndex === -1 || meetingType === 0 || data.id === currentZoomVideoId) {
-                let zoomDomArr = document.querySelectorAll(".video-box") as NodeListOf<HTMLElement>
-                zoomDomArr.forEach(item => {
-                    item.removeAttribute("style")
-                })
-                setZoomIndex(-1)
-                initLayout()
-            } else {
-                enlargeVideo()
-            }
             setUserList([...userListRef.current])
         })
-
 
         return () => {
             eventBus.clear()
@@ -145,6 +145,29 @@ const RoomPhone: FC = () => {
         }
 
     }, [])
+
+    useEffect(() => {
+        let toolbarIndex = -1
+        const clickHandle = () => {
+            if (meetingType !== 0) return
+            setIsShowToolbar(!isShowToolbar)
+        }
+        if (isShowToolbar) {
+            toolbarIndex = window.setTimeout(() => {
+                setIsShowToolbar(false)
+            }, 10000)
+        } else {
+            clearInterval(toolbarIndex)
+        }
+        const largeDom = document.querySelector(".large-video") as HTMLDivElement
+        largeDom?.addEventListener("click", clickHandle)
+
+
+        return () => {
+            clearInterval(toolbarIndex)
+            largeDom?.removeEventListener("click", clickHandle)
+        }
+    }, [isZoomVideo, isShowToolbar]);
 
     useEffect(() => {
         if (zoomIndex === -1 || leaveUserId === currentZoomVideoId || userList.length === 0) {
@@ -158,6 +181,7 @@ const RoomPhone: FC = () => {
             enlargeVideo()
         }
     }, [userList]);
+
     const toggleVideo = () => {
         if (!client.isHasAuth) return
         rtcClient.current?.changeCameraStatus(!videoStatus)
@@ -181,9 +205,13 @@ const RoomPhone: FC = () => {
     const initLayout = () => {
         let zoomDomArr = document.querySelectorAll(".video-box") as NodeListOf<HTMLElement>
         let length = userList.length
-        length = videoStatus ? length + 1 : length
+        length = length + 1
         let width: number
         if (meetingType === 0) {
+            let zoomDomArr = document.querySelectorAll(".video-box") as NodeListOf<HTMLElement>
+            zoomDomArr.forEach(item => {
+                item.removeAttribute("style")
+            })
             setIsZoomVideo(length !== 1)
         } else {
             if (length === 1) {
@@ -280,7 +308,6 @@ const RoomPhone: FC = () => {
 
     const zoomVideo = (index: number, clientId: string) => {
         let zoomDomArr = document.querySelectorAll(".video-box") as NodeListOf<HTMLElement>
-
         if (meetingType === 0) {
             if ((zoomIndex === -1 && index === 1) || userList.length === 0) return;
             if (index !== zoomIndex) {
@@ -288,6 +315,9 @@ const RoomPhone: FC = () => {
                 setZoomIndex(index)
             }
         } else {
+            if (userList.length === 0) {
+                return;
+            }
             if (index === zoomIndex) {
                 setIsLarge(false)
                 setZoomIndex(-1)
@@ -308,7 +338,7 @@ const RoomPhone: FC = () => {
     useEffect(() => {
         if (zoomIndex === -1) {
             initLayout()
-        } else if (!isLarge) {
+        } else if (!isLarge && meetingType === 1) {
             enlargeVideo()
         }
     }, [zoomIndex]);
@@ -318,7 +348,8 @@ const RoomPhone: FC = () => {
     }
 
     return <RoomPhoneWrapper>
-        <div className={classNames(zoomIndex === -1 ? "video-area" : "zoom-area", meetingType === 0 ? "p2p" : "")} ref={areaBox}>
+        <div className={classNames(zoomIndex === -1 ? "video-area" : "zoom-area", meetingType === 0 ? "p2p" : "")}
+             ref={areaBox}>
             <div
                 className={classNames("video-box self-video", zoomIndex === 0 ? "zoom" : "", roomType === 1 || meetingType !== 0 || userList.length === 0 ? "show" : "hide", meetingType === 0 && (isZoomVideo ? 'shrink-video' : 'large-video'))}
                 onClick={() => zoomVideo(0, "selfVideo")}>
@@ -335,9 +366,9 @@ const RoomPhone: FC = () => {
                 userList.map((user, index) => {
                     return <div
                         className={classNames("video-box", meetingType === 0 && (isZoomVideo ? 'large-video' : 'shrink-video'))}
+                        onClick={() => zoomVideo(index + 1, user.id)}
                         key={user.id}>
                         <video className={classNames("video", user.videoStatus ? "show" : "hide")}
-                               onClick={() => zoomVideo(index + 1, user.id)}
                                id={"video_" + user.id}
                                autoPlay
                                muted></video>
@@ -393,8 +424,8 @@ const RoomPhone: FC = () => {
                         <div onClick={leave} className={"hangup"}>
                             <img className="exit" src={exit} alt=""/>
                         </div>
-                        <div onClick={switchCamera}>
-                            <img className="change" src={reverseCamera} alt=""/>
+                        <div>
+                            <img onClick={switchCamera} className="change" src={reverseCameraWhite} alt=""/>
                         </div>
                     </div>
                 </div> : null
